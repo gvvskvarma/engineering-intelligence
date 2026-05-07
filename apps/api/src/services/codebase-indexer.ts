@@ -6,13 +6,15 @@ import {
   shouldIndexFile,
   type CodeChunk,
 } from "../utils/code-chunker";
-import { generateEmbedding } from "./gemini";
+import { generateEmbeddingsBatch } from "./gemini";
 
-// Free-tier guardrails: keep individual repos within bounds so we don't burn
-// the daily Gemini quota and so progress is visible to the user in reasonable time.
+// Free-tier guardrails. The Gemini free tier on gemini-embedding-001 caps at
+// ~1000 requests/day shared across the whole project, so we batch aggressively.
 const MAX_FILES = 500;
-const EMBED_CONCURRENCY = 4;
+const FILE_FETCH_CONCURRENCY = 5;
+const EMBED_BATCH_SIZE = 100;
 const INSERT_BATCH = 50;
+const RATE_LIMIT_BACKOFF_MS = 30_000;
 
 interface IndexInput {
   userId: string;
@@ -35,12 +37,10 @@ export async function startIndexing({
 
   const octokit = await octokitForUser(userId);
 
-  // Verify access + fetch default branch.
   const repoInfo = await octokit.repos.get({ owner, repo });
   const defaultBranch = repoInfo.data.default_branch;
   const repoUrl = repoInfo.data.html_url;
 
-  // Upsert the code_repos row with status indexing.
   const { data: existing } = await supabaseAdmin
     .from("code_repos")
     .select("id")
@@ -51,7 +51,6 @@ export async function startIndexing({
   let repoId: string;
   if (existing) {
     repoId = existing.id;
-    // Wipe any prior chunks so a re-index doesn't double-up.
     await supabaseAdmin.from("code_chunks").delete().eq("repo_id", repoId);
     await supabaseAdmin
       .from("code_repos")
@@ -62,6 +61,7 @@ export async function startIndexing({
         file_count: 0,
         chunk_count: 0,
         last_indexed_at: null,
+        failure_reason: null,
       })
       .eq("id", repoId);
   } else {
@@ -80,13 +80,13 @@ export async function startIndexing({
     repoId = created.id;
   }
 
-  // Run the rest async — return the id immediately so the caller can poll.
   void runIndex({ userId, repoId, owner, repo, octokit, defaultBranch }).catch(
     async (err) => {
+      const message = humanReason(err);
       console.error(`[indexer] ${repoFullName} failed:`, err);
       await supabaseAdmin
         .from("code_repos")
-        .update({ status: "failed" })
+        .update({ status: "failed", failure_reason: message })
         .eq("id", repoId);
     }
   );
@@ -126,44 +126,78 @@ async function runIndex({
       shouldIndexFile(entry.path, entry.size)
   );
 
-  const truncated = tree.data.truncated;
+  if (blobs.length === 0) {
+    await supabaseAdmin
+      .from("code_repos")
+      .update({
+        status: "ready",
+        file_count: 0,
+        chunk_count: 0,
+        last_indexed_at: new Date().toISOString(),
+      })
+      .eq("id", repoId);
+    return;
+  }
+
   const slice = blobs.slice(0, MAX_FILES);
 
+  // Fetch blobs with bounded concurrency.
+  const fileContents: { path: string; content: string }[] = [];
+  for (let i = 0; i < slice.length; i += FILE_FETCH_CONCURRENCY) {
+    const batch = slice.slice(i, i + FILE_FETCH_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (entry) => {
+        try {
+          const blob = await octokit.git.getBlob({
+            owner,
+            repo,
+            file_sha: entry.sha!,
+          });
+          const content =
+            blob.data.encoding === "base64"
+              ? Buffer.from(blob.data.content, "base64").toString("utf-8")
+              : blob.data.content;
+          return { path: entry.path!, content };
+        } catch (err) {
+          console.warn(`[indexer] skipping ${entry.path}:`, err);
+          return null;
+        }
+      })
+    );
+    for (const r of results) if (r) fileContents.push(r);
+  }
+
+  // Chunk all files.
   const allChunks: CodeChunk[] = [];
-  let processedFiles = 0;
-
-  for (const entry of slice) {
-    try {
-      const blob = await octokit.git.getBlob({
-        owner,
-        repo,
-        file_sha: entry.sha!,
-      });
-      const content =
-        blob.data.encoding === "base64"
-          ? Buffer.from(blob.data.content, "base64").toString("utf-8")
-          : blob.data.content;
-      const chunks = chunkFile({ filePath: entry.path!, content });
-      allChunks.push(...chunks);
-      processedFiles++;
-    } catch (err) {
-      console.warn(`[indexer] skipping ${entry.path}:`, err);
-    }
+  for (const { path, content } of fileContents) {
+    const chunks = chunkFile({ filePath: path, content });
+    allChunks.push(...chunks);
   }
 
-  // Embed in parallel-batched chunks to stay under Gemini RPM but still finish quickly.
-  const embedded: Array<CodeChunk & { embedding: number[] }> = [];
-  for (let i = 0; i < allChunks.length; i += EMBED_CONCURRENCY) {
-    const batch = allChunks.slice(i, i + EMBED_CONCURRENCY);
-    const embeddings = await Promise.all(
-      batch.map((c) => embedWithRetry(c.content))
-    );
-    batch.forEach((chunk, idx) =>
-      embedded.push({ ...chunk, embedding: embeddings[idx] })
-    );
+  if (allChunks.length === 0) {
+    await supabaseAdmin
+      .from("code_repos")
+      .update({
+        status: "ready",
+        file_count: fileContents.length,
+        chunk_count: 0,
+        last_indexed_at: new Date().toISOString(),
+      })
+      .eq("id", repoId);
+    return;
   }
 
-  // Bulk-insert in modest batches so a single huge insert doesn't time out.
+  // Embed in batches of 100 with retry-on-429.
+  const embeddings: number[][] = [];
+  for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
+    const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
+    const texts = batch.map((c) => c.content);
+    const batchEmbeddings = await embedBatchWithRetry(texts);
+    embeddings.push(...batchEmbeddings);
+  }
+
+  // Bulk-insert.
+  const embedded = allChunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
   for (let i = 0; i < embedded.length; i += INSERT_BATCH) {
     const slice = embedded.slice(i, i + INSERT_BATCH);
     const rows = slice.map((c) => ({
@@ -185,29 +219,47 @@ async function runIndex({
     .from("code_repos")
     .update({
       status: "ready",
-      file_count: processedFiles,
+      file_count: fileContents.length,
       chunk_count: embedded.length,
       last_indexed_at: new Date().toISOString(),
     })
     .eq("id", repoId);
-
-  if (truncated) {
-    console.warn(
-      `[indexer] tree truncated for ${owner}/${repo}; only first ${slice.length} files indexed`
-    );
-  }
 }
 
-async function embedWithRetry(text: string, attempts = 3): Promise<number[]> {
+async function embedBatchWithRetry(texts: string[]): Promise<number[][]> {
+  const attempts = 4;
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await generateEmbedding(text);
+      return await generateEmbeddingsBatch(texts);
     } catch (err) {
       lastErr = err;
-      // Exponential backoff for 429 / transient errors.
-      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, i)));
+      const message = err instanceof Error ? err.message : String(err);
+      const is429 = message.includes("429");
+      const wait = is429
+        ? RATE_LIMIT_BACKOFF_MS * (i + 1)
+        : 1_000 * Math.pow(2, i);
+      console.warn(
+        `[indexer] embed batch retry ${i + 1}/${attempts} after ${wait}ms:`,
+        message.slice(0, 200)
+      );
+      await new Promise((r) => setTimeout(r, wait));
     }
   }
   throw lastErr ?? new Error("embedding failed after retries");
+}
+
+function humanReason(err: unknown): string {
+  if (!(err instanceof Error)) return "Unknown failure.";
+  const msg = err.message;
+  if (msg.includes("429")) {
+    return "Hit Gemini's free-tier rate limit. Wait a minute (or until tomorrow if you've used the daily quota) and try again.";
+  }
+  if (msg.includes("404")) {
+    return "Couldn't access the repo. It may be private without the right scope, archived, or empty.";
+  }
+  if (msg.includes("403")) {
+    return "GitHub denied access to that repo. Reconnect GitHub with full repo scope.";
+  }
+  return msg.length > 300 ? `${msg.slice(0, 300)}…` : msg;
 }

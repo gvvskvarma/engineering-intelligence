@@ -74,12 +74,12 @@ export default function AskChatPage({
             <CardContent className="p-6 flex items-center gap-4">
               {repo.status === "failed" ? (
                 <>
-                  <XCircle className="h-5 w-5 text-destructive" />
+                  <XCircle className="h-5 w-5 text-destructive shrink-0" />
                   <div>
                     <p className="font-medium">Indexing failed</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Try removing and reconnecting the repo. If it keeps
-                      failing, the repo may be too large for the free tier.
+                      {repo.failure_reason ??
+                        "Try removing and reconnecting the repo."}
                     </p>
                   </div>
                 </>

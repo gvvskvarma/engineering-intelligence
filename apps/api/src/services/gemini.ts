@@ -66,4 +66,44 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return values;
 }
 
+// Batch endpoint — up to 100 texts per request. Critical for staying under
+// the 1000 RPD free-tier cap when indexing repos.
+const BATCH_LIMIT = 100;
+
+export async function generateEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return [];
+
+  const all: number[][] = [];
+  for (let i = 0; i < texts.length; i += BATCH_LIMIT) {
+    const slice = texts.slice(i, i + BATCH_LIMIT);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: slice.map((text) => ({
+          model: `models/${EMBEDDING_MODEL}`,
+          content: { parts: [{ text }] },
+          outputDimensionality: EMBEDDING_DIMS,
+        })),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Batch embedding failed: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as {
+      embeddings?: Array<{ values?: number[] }>;
+    };
+    const embeddings = data.embeddings;
+    if (!embeddings || embeddings.length !== slice.length) {
+      throw new Error("Batch embedding returned unexpected shape");
+    }
+    for (const emb of embeddings) {
+      if (!emb.values) throw new Error("Batch embedding had missing values");
+      all.push(emb.values);
+    }
+  }
+  return all;
+}
+
 export { SchemaType };

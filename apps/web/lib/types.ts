@@ -37,6 +37,7 @@ export interface CodeRepo {
   file_count: number;
   chunk_count: number;
   last_indexed_at: string | null;
+  failure_reason: string | null;
   created_at: string;
 }
 
