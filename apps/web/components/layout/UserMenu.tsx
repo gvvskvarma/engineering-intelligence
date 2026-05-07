@@ -62,10 +62,7 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            void signOut();
-          }}
+          onClick={() => void signOut()}
           className="cursor-pointer"
         >
           <LogOut className="mr-2 h-4 w-4" />
