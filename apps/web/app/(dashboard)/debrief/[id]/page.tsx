@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useDebrief } from "@/hooks/useDebriefs";
@@ -14,10 +13,9 @@ import { cn } from "@/lib/utils";
 export default function DebriefDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
-  const { data, isLoading, error } = useDebrief(id);
+  const { data, isLoading, error } = useDebrief(params.id);
 
   if (isLoading) {
     return (
