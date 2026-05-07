@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { RenameDebriefDialog } from "./RenameDebriefDialog";
 import { DeleteDebriefDialog } from "./DeleteDebriefDialog";
 
@@ -29,7 +30,8 @@ export function DebriefActionsMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon-sm" aria-label="More" />}
+          aria-label="Debrief actions"
+          className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
         >
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>

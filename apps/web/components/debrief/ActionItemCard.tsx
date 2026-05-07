@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import type { ActionItem, Priority } from "@/lib/types";
 import { useDeleteActionItem } from "@/hooks/useDebriefs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -76,13 +76,10 @@ export function ActionItemCard({ item }: ActionItemCardProps) {
               </Badge>
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Item actions"
-                    />
-                  }
+                  aria-label="Item actions"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "icon-xs" })
+                  )}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </DropdownMenuTrigger>
