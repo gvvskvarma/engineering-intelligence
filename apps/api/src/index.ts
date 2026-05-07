@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import { debriefRouter } from "./routes/debrief";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -13,6 +14,8 @@ app.use(express.json({ limit: "5mb" }));
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "engineering-intelligence-api" });
 });
+
+app.use("/api/debrief", debriefRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
