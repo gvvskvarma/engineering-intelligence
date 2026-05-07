@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -45,18 +46,20 @@ export function UserMenu({ user }: UserMenuProps) {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium truncate">
-              {user.name ?? "Signed in"}
-            </span>
-            {user.email && (
-              <span className="text-xs text-muted-foreground truncate">
-                {user.email}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium truncate">
+                {user.name ?? "Signed in"}
               </span>
-            )}
-          </div>
-        </DropdownMenuLabel>
+              {user.email && (
+                <span className="text-xs text-muted-foreground truncate">
+                  {user.email}
+                </span>
+              )}
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(e) => {
