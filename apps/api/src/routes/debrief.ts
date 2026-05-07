@@ -57,6 +57,60 @@ debriefRouter.get("/:id", async (req: AuthedRequest, res: Response) => {
   res.json({ debrief, action_items: actionItems ?? [] });
 });
 
+debriefRouter.patch("/:id", async (req: AuthedRequest, res: Response) => {
+  const userId = req.userId!;
+  const { id } = req.params;
+  const { title } = req.body as { title?: string | null };
+
+  const trimmed = typeof title === "string" ? title.trim() : null;
+  if (trimmed !== null && trimmed.length > 200) {
+    return res.status(400).json({ error: "title must be 200 characters or fewer" });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("debriefs")
+    .update({ title: trimmed && trimmed.length > 0 ? trimmed : null })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id, title")
+    .single();
+  if (error || !data) return res.status(404).json({ error: "not found" });
+  res.json(data);
+});
+
+debriefRouter.delete("/:id", async (req: AuthedRequest, res: Response) => {
+  const userId = req.userId!;
+  const { id } = req.params;
+
+  const { data, error } = await supabaseAdmin
+    .from("debriefs")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .single();
+  if (error || !data) return res.status(404).json({ error: "not found" });
+  res.json({ deleted: true });
+});
+
+debriefRouter.delete(
+  "/action-items/:itemId",
+  async (req: AuthedRequest, res: Response) => {
+    const userId = req.userId!;
+    const { itemId } = req.params;
+
+    const { data, error } = await supabaseAdmin
+      .from("action_items")
+      .delete()
+      .eq("id", itemId)
+      .eq("user_id", userId)
+      .select("id, debrief_id")
+      .single();
+    if (error || !data) return res.status(404).json({ error: "not found" });
+    res.json({ deleted: true, debrief_id: data.debrief_id });
+  }
+);
+
 debriefRouter.post("/process", async (req: AuthedRequest, res: Response) => {
   const userId = req.userId!;
   const { transcript, title } = req.body as { transcript?: string; title?: string };

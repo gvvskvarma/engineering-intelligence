@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ActionItemCard } from "@/components/debrief/ActionItemCard";
+import { DebriefActionsMenu } from "@/components/debrief/DebriefActionsMenu";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { cn } from "@/lib/utils";
 
@@ -52,13 +53,19 @@ export default function DebriefDetailPage({
         title={debrief.title ?? "Untitled meeting"}
         description={`${date} · ${action_items.length} action item${action_items.length === 1 ? "" : "s"}`}
         actions={
-          <Link
-            href="/debrief"
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            All debriefs
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/debrief"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              All debriefs
+            </Link>
+            <DebriefActionsMenu
+              debriefId={debrief.id}
+              currentTitle={debrief.title}
+            />
+          </div>
         }
       />
       <div className="px-8 py-8 max-w-3xl space-y-8">

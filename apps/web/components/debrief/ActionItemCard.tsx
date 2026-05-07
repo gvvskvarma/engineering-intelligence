@@ -1,11 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, ExternalLink, User } from "lucide-react";
+import {
+  Calendar,
+  ExternalLink,
+  Loader2,
+  MoreHorizontal,
+  Trash2,
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
 import type { ActionItem, Priority } from "@/lib/types";
+import { useDeleteActionItem } from "@/hooks/useDebriefs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { GithubIcon } from "@/components/ui/brand-icons";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { cn } from "@/lib/utils";
@@ -21,7 +46,20 @@ const PRIORITY_STYLES: Record<Priority, string> = {
 };
 
 export function ActionItemCard({ item }: ActionItemCardProps) {
-  const [open, setOpen] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const remove = useDeleteActionItem(item.debrief_id);
+
+  async function handleDelete() {
+    if (remove.isPending) return;
+    try {
+      await remove.mutateAsync(item.id);
+      setConfirmOpen(false);
+      toast.success("Action item removed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete item.");
+    }
+  }
 
   return (
     <>
@@ -29,12 +67,37 @@ export function ActionItemCard({ item }: ActionItemCardProps) {
         <CardContent className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-medium leading-snug">{item.title}</h3>
-            <Badge
-              variant="secondary"
-              className={cn("shrink-0", PRIORITY_STYLES[item.priority])}
-            >
-              {item.priority}
-            </Badge>
+            <div className="flex items-center gap-1 shrink-0">
+              <Badge
+                variant="secondary"
+                className={cn(PRIORITY_STYLES[item.priority])}
+              >
+                {item.priority}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Item actions"
+                    />
+                  }
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setConfirmOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete item
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           {item.description && (
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -72,7 +135,7 @@ export function ActionItemCard({ item }: ActionItemCardProps) {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setOpen(true)}
+                onClick={() => setIssueOpen(true)}
               >
                 <GithubIcon className="mr-1.5 h-3.5 w-3.5" />
                 Create GitHub Issue
@@ -81,7 +144,34 @@ export function ActionItemCard({ item }: ActionItemCardProps) {
           </div>
         </CardContent>
       </Card>
-      <CreateIssueModal item={item} open={open} onOpenChange={setOpen} />
+      <CreateIssueModal item={item} open={issueOpen} onOpenChange={setIssueOpen} />
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this action item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {item.github_issue_url
+                ? "The linked GitHub issue will not be deleted; only the local copy goes away."
+                : "This only removes it from the debrief. You can always re-extract from the original transcript."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -47,3 +47,47 @@ export function useProcessDebrief() {
     },
   });
 }
+
+export function useUpdateDebriefTitle(debriefId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string | null) =>
+      apiFetch<{ id: string; title: string | null }>(`/api/debrief/${debriefId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["debrief", debriefId] });
+      qc.invalidateQueries({ queryKey: ["debriefs"] });
+    },
+  });
+}
+
+export function useDeleteDebrief() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (debriefId: string) =>
+      apiFetch<{ deleted: true }>(`/api/debrief/${debriefId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: (_data, debriefId) => {
+      qc.invalidateQueries({ queryKey: ["debriefs"] });
+      qc.removeQueries({ queryKey: ["debrief", debriefId] });
+    },
+  });
+}
+
+export function useDeleteActionItem(debriefId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (actionItemId: string) =>
+      apiFetch<{ deleted: true; debrief_id: string }>(
+        `/api/debrief/action-items/${actionItemId}`,
+        { method: "DELETE" }
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["debrief", debriefId] });
+      qc.invalidateQueries({ queryKey: ["debriefs"] });
+    },
+  });
+}
