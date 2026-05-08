@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { debriefRouter } from "./routes/debrief";
 import { githubRouter } from "./routes/github";
 import { askRouter } from "./routes/ask";
+import { digestRouter } from "./routes/digest";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -20,6 +21,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/api/debrief", debriefRouter);
 app.use("/api/github", githubRouter);
 app.use("/api/ask", askRouter);
+app.use("/api/digest", digestRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
