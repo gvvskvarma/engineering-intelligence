@@ -23,6 +23,13 @@ export function useCodeRepos() {
     queryKey: ["code-repos"],
     queryFn: () => apiFetch<{ repos: CodeRepo[] }>("/api/ask/repos"),
     select: (d) => d.repos,
+    refetchInterval: (query) => {
+      const repos = query.state.data?.repos ?? [];
+      const anyActive = repos.some(
+        (r) => r.status === "indexing" || r.status === "pending"
+      );
+      return anyActive ? 3000 : false;
+    },
   });
 }
 

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RepoConnector } from "@/components/ask/RepoConnector";
+import { RepoActionsMenu } from "@/components/ask/RepoActionsMenu";
 import { cn } from "@/lib/utils";
 
 export default function AskListPage() {
@@ -69,41 +70,48 @@ export default function AskListPage() {
 function RepoRow({ repo }: { repo: CodeRepo }) {
   const isReady = repo.status === "ready";
 
-  const inner = (
+  const body = (
+    <div className="flex-1 min-w-0 flex items-center justify-between gap-4 px-4 py-3">
+      <div className="min-w-0">
+        <p className="font-medium truncate">{repo.repo_full_name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {repo.status === "ready" && (
+            <>
+              {repo.file_count} files · {repo.chunk_count} chunks
+            </>
+          )}
+          {repo.status === "indexing" && "Indexing…"}
+          {repo.status === "pending" && "Queued for indexing…"}
+          {repo.status === "failed" &&
+            (repo.failure_reason ? repo.failure_reason : "Indexing failed")}
+        </p>
+      </div>
+      <StatusBadge status={repo.status} />
+    </div>
+  );
+
+  return (
     <Card
       className={cn(
-        "transition-colors",
+        "transition-colors overflow-hidden",
         isReady && "hover:bg-secondary/30",
-        !isReady && "opacity-90"
+        !isReady && "opacity-95"
       )}
     >
-      <CardContent className="p-4 flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="font-medium truncate">{repo.repo_full_name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {repo.status === "ready" && (
-              <>
-                {repo.file_count} files · {repo.chunk_count} chunks
-              </>
-            )}
-            {repo.status === "indexing" && "Indexing…"}
-            {repo.status === "pending" && "Queued for indexing…"}
-            {repo.status === "failed" && "Indexing failed"}
-          </p>
+      <CardContent className="p-0 flex items-stretch">
+        {isReady ? (
+          <Link href={`/ask/${repo.id}`} className="flex-1 flex min-w-0">
+            {body}
+          </Link>
+        ) : (
+          <div className="flex-1 flex min-w-0 cursor-default">{body}</div>
+        )}
+        <div className="pr-3 flex items-center">
+          <RepoActionsMenu repo={repo} />
         </div>
-        <StatusBadge status={repo.status} />
       </CardContent>
     </Card>
   );
-
-  if (isReady) {
-    return (
-      <Link href={`/ask/${repo.id}`} className="block">
-        {inner}
-      </Link>
-    );
-  }
-  return <div className="cursor-default">{inner}</div>;
 }
 
 function StatusBadge({ status }: { status: RepoStatus }) {
