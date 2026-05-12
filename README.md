@@ -19,6 +19,27 @@ A working AI product, not a demo. Engineers spend their day in a few familiar lo
 
 All running on free tiers — Vercel + Render + Supabase + Gemini. No paid services, no abandoned features.
 
+### Who this is for
+
+**Built for solo devs, OSS maintainers, and individual engineers exploring AI workflows on code they own or have read access to.** Everything works on public data — none of the modules require connecting proprietary or company repos. Sign in with personal GitHub, point it at a public repo, see it work.
+
+Teams handling sensitive code should self-host (Docker compose target lives at the bottom of this README). SOC 2, SSO, BYO-LLM, and the enterprise security review process are explicitly *not* scoped here.
+
+---
+
+## Try it in 60 seconds
+
+[Live URL](https://ei-app.vercel.app) → sign in with personal GitHub → pick any module → use one of these as your test target:
+
+| Module | Try this |
+|---|---|
+| 🎙️ **Meeting Debrief** | Paste any meeting-style text. Even a fictional script works — the AI extraction quality is what's on display, not the meeting content. |
+| 🔍 **Codebase Q&A** | Connect this very repo (`gvvskvarma/engineering-intelligence`) and ask *"How does the codebase Q&A indexer work?"* Or try a public OSS repo like `vercel/next.js` (large) or `expressjs/express` (compact). |
+| ☀️ **Daily Digest** | Just generate. Pulls your public GitHub activity. Works even on days you didn't push anything. |
+| 📋 **Changelog Generator** | Pick any public repo with recent merged PRs and a 7-day window. Try `vercel/next.js`, `withastro/astro`, or `expressjs/express`. |
+
+Everything below is *how* it's built.
+
 ---
 
 ## The four modules
