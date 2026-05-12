@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, Lock, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useGithubRepos } from "@/hooks/useGithub";
@@ -30,7 +29,6 @@ export function RepoConnector({
   onOpenChange,
   alreadyConnected,
 }: RepoConnectorProps) {
-  const router = useRouter();
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const repos = useGithubRepos(open);
@@ -46,10 +44,11 @@ export function RepoConnector({
   async function handleConnect() {
     if (!selected || indexRepo.isPending) return;
     try {
-      const result = await indexRepo.mutateAsync(selected);
+      await indexRepo.mutateAsync(selected);
       onOpenChange(false);
+      setSelected(null);
+      setFilter("");
       toast.success("Indexing started — usually takes a minute or two.");
-      router.push(`/ask/${result.repo_id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't start indexing.");
     }
