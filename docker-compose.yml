@@ -1,0 +1,64 @@
+# Self-host target. Brings up the Express API and the Next.js web app in two
+# containers that talk to each other on a Docker network and to a remote
+# Supabase + Gemini for storage and LLM.
+#
+# Quick start:
+#   1. cp .env.example .env
+#   2. Fill in the Supabase, Gemini, and GitHub OAuth values in .env
+#   3. docker compose up --build
+#   4. open http://localhost:3000
+#
+# Why not Postgres + Ollama here too? Supabase gives you Auth + RLS + pgvector
+# + Realtime in one place — none of which is trivial to self-host. If you want
+# fully on-prem, swap the Supabase env vars for a self-hosted Supabase install
+# (https://supabase.com/docs/guides/self-hosting) and the Gemini key for an
+# OpenAI / Ollama base URL (small code change in apps/api/src/services/gemini.ts).
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    image: engineering-intelligence-api:local
+    container_name: ei-api
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      WEB_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID}
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    image: engineering-intelligence-web:local
+    container_name: ei-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID}
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy

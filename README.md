@@ -23,7 +23,7 @@ All running on free tiers — Vercel + Render + Supabase + Gemini. No paid servi
 
 **Built for solo devs, OSS maintainers, and individual engineers exploring AI workflows on code they own or have read access to.** Everything works on public data — none of the modules require connecting proprietary or company repos. Sign in with personal GitHub, point it at a public repo, see it work.
 
-Teams handling sensitive code should self-host (Docker compose target lives at the bottom of this README). SOC 2, SSO, BYO-LLM, and the enterprise security review process are explicitly *not* scoped here.
+Teams handling sensitive code can self-host with one command — see [`DOCKER.md`](DOCKER.md). SOC 2, SSO, BYO-LLM, and the enterprise security review process are explicitly *not* scoped here.
 
 ---
 
@@ -232,6 +232,18 @@ cd apps/web && npm install && npm run dev   # → http://localhost:3000
 ```
 
 For GitHub OAuth setup, the callback URL is `https://<your-supabase-url>/auth/v1/callback` — that's Supabase's callback, not your app's.
+
+### Self-hosting with Docker
+
+For engineers who'd rather not trust the hosted version with their GitHub token:
+
+```bash
+cp .env.example .env  # fill in Supabase + Gemini + GitHub OAuth keys
+docker compose up --build
+# → http://localhost:3000
+```
+
+Full instructions in [`DOCKER.md`](DOCKER.md). Brings up Express + Next.js in two containers, with Supabase cloud and Gemini as external dependencies. Notes on going fully on-prem (self-hosted Supabase + local LLM) included.
 
 ---
 
