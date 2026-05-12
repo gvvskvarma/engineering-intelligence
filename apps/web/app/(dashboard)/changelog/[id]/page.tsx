@@ -8,7 +8,9 @@ import {
   Check,
   Copy,
   Download,
+  Info,
   Loader2,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/tabs";
 import { DigestMarkdown } from "@/components/digest/DigestMarkdown";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { RegenerateDialog } from "@/components/changelog/RegenerateDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +56,7 @@ export default function ChangelogDetailPage({
   const remove = useDeleteChangelog();
   const [tab, setTab] = useState<Audience>("engineer");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   if (isLoading) {
@@ -121,6 +125,7 @@ export default function ChangelogDetailPage({
   }
 
   const range = `${formatDate(changelog.date_from)} → ${formatDate(changelog.date_to)}`;
+  const isEmpty = (changelog.raw_activity?.pr_count ?? 0) === 0;
 
   return (
     <>
@@ -136,16 +141,25 @@ export default function ChangelogDetailPage({
               <ArrowLeft className="mr-1.5 h-4 w-4" />
               All changelogs
             </Link>
-            <button
+            <Button
               type="button"
-              aria-label="Delete changelog"
-              onClick={() => setConfirmOpen(true)}
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon-sm" })
-              )}
+              variant="outline"
+              size="sm"
+              onClick={() => setRegenerateOpen(true)}
             >
-              <Trash2 className="h-4 w-4" />
-            </button>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Regenerate
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmOpen(true)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Delete
+            </Button>
           </div>
         }
       />
@@ -175,7 +189,7 @@ export default function ChangelogDetailPage({
             </div>
           </div>
           {TABS.map((t) => (
-            <TabsContent key={t.key} value={t.key} className="mt-4">
+            <TabsContent key={t.key} value={t.key} className="mt-4 space-y-4">
               <Card>
                 <CardContent className="p-6">
                   {versions[t.key] ? (
@@ -187,10 +201,19 @@ export default function ChangelogDetailPage({
                   )}
                 </CardContent>
               </Card>
+              {isEmpty && <EmptyWindowHint onRegenerate={() => setRegenerateOpen(true)} />}
             </TabsContent>
           ))}
         </Tabs>
       </div>
+
+      <RegenerateDialog
+        repoFullName={changelog.repo_full_name}
+        initialFrom={changelog.date_from}
+        initialTo={changelog.date_to}
+        open={regenerateOpen}
+        onOpenChange={setRegenerateOpen}
+      />
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
@@ -228,4 +251,30 @@ function formatDate(iso: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function EmptyWindowHint({ onRegenerate }: { onRegenerate: () => void }) {
+  return (
+    <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900/40">
+      <CardContent className="py-4 px-5 flex items-start gap-3 text-sm">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="space-y-2">
+          <p>
+            <span className="font-medium">No merged PRs in this window.</span>{" "}
+            The changelog tool only counts PRs that were merged — direct commits to
+            <code className="font-mono px-1">main</code> aren&apos;t included.
+          </p>
+          <p className="text-muted-foreground">
+            For repos using a PR-based workflow, try a wider window. For solo
+            repos with direct pushes, the <strong>Daily Digest</strong> module
+            covers commit activity instead.
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={onRegenerate}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Try a different window
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
