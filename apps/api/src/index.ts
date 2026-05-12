@@ -6,6 +6,7 @@ import { debriefRouter } from "./routes/debrief";
 import { githubRouter } from "./routes/github";
 import { askRouter } from "./routes/ask";
 import { digestRouter } from "./routes/digest";
+import { changelogRouter } from "./routes/changelog";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -22,6 +23,7 @@ app.use("/api/debrief", debriefRouter);
 app.use("/api/github", githubRouter);
 app.use("/api/ask", askRouter);
 app.use("/api/digest", digestRouter);
+app.use("/api/changelog", changelogRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
